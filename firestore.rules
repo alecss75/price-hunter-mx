@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Regla global: Por defecto, rechazar todo
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // cached_results: Cualquier usuario puede leer (precios públicos)
+    // Solo el backend puede escribir (en producción, usa Service Account)
+    match /cached_results/{query} {
+      allow read: if true;
+      allow write: if false; // Solo via Admin SDK (backend)
+    }
+    
+    // tracking privado: Solo el dueño puede leer/escribir su lista
+    match /users/{userId}/tracking/{trackingId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // tracked_queries legacy (si aún la usas): Solo lectura pública
+    match /tracked_queries/{query} {
+      allow read: if true;
+      allow write: if false; // Solo Admin SDK
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "price-hunter-mx",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "cd frontend && ng serve",
+    "start": "cd frontend && ng serve",
+    "build": "cd frontend && ng build",
+    "preview": "cd frontend && ng serve --configuration=production",
+    "deploy": "npm run build && firebase deploy --only hosting",
+    "deploy:backend": "cd backend && gcloud run deploy price-hunter-backend --source . --region us-central1 --allow-unauthenticated"
+  },
+  "dependencies": {
+    "@angular/common": "^20.3.0",
+    "@angular/compiler": "^20.3.0",
+    "@angular/core": "^20.3.0",
+    "@angular/forms": "^20.3.13",
+    "@angular/platform-browser": "^20.3.0",
+    "firebase": "^10.12.4",
+    "rxjs": "^7.8.2",
+    "tailwindcss": "latest"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^20.3.11",
+    "@angular/build": "^20.3.0",
+    "@angular/cli": "^20.3.0",
+    "@angular/compiler-cli": "^20.3.0",
+    "@types/node": "^22.14.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

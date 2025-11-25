@@ -1,0 +1,36 @@
+name: Daily Price Scraper
+
+on:
+  schedule:
+    # Ejecutar a las 8:00 AM y 8:00 PM (UTC) todos los días
+    # Puedes ajustar la hora (UTC es +6 horas vs CDMX aprox)
+    - cron: '0 14 * * *' # 8 AM CDMX
+    - cron: '0 2 * * *'  # 8 PM CDMX
+  workflow_dispatch: # Permite correrlo manual con un botón
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Instalar Dependencias
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          playwright install chromium
+          playwright install-deps
+
+      - name: Correr Scraper
+        env:
+          # Aquí inyectamos el secreto como variable de entorno
+          FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+        run: |
+          cd backend
+          python run_scraper.py
