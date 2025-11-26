@@ -340,29 +340,21 @@ export class ProductService {
 
   /**
    * Dispara manualmente el workflow de GitHub Actions para actualizar precios
-   * Ahora llama al backend que valida la autenticación y dispara el workflow de forma segura
    */
-  async triggerScraper() {
-    const user = firebaseAuth.currentUser;
-    
-    if (!user) {
-      console.error('⚠️ Usuario no autenticado');
-      return of({ error: 'Debes iniciar sesión para usar esta función' });
+  triggerScraper() {
+    const url = `https://api.github.com/repos/${environment.githubRepo}/actions/workflows/scraper.yml/dispatches`;
+    const token = environment.githubToken;
+
+    if (!token) {
+      console.error('⚠️ GitHub token no configurado en environment.ts');
+      return of({ error: 'Token no configurado' });
     }
 
-    try {
-      // Obtener el token de Firebase del usuario actual
-      const idToken = await user.getIdToken();
-      
-      const url = `${environment.apiUrl}/trigger-scraper`;
-      const headers = new HttpHeaders({
-        'Authorization': `Bearer ${idToken}`
-      });
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json'
+    });
 
-      return this.http.post(url, {}, { headers });
-    } catch (error) {
-      console.error('Error obteniendo token de Firebase:', error);
-      return of({ error: 'Error de autenticación' });
-    }
+    return this.http.post(url, { ref: 'main' }, { headers });
   }
 }

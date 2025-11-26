@@ -92,20 +92,14 @@ export class AppComponent {
   }
 
   triggerManualUpdate(): void {
-    this.productService.triggerScraper().then(observable => {
-      observable?.subscribe({
-        next: () => {
-          alert('✅ Actualización programada iniciada. Los precios se actualizarán en unos minutos.');
-        },
-        error: (err) => {
-          console.error('Error disparando scraper:', err);
-          if (err.status === 401) {
-            alert('❌ Debes iniciar sesión para usar esta función.');
-          } else {
-            alert('❌ Error al iniciar actualización. Revisa la consola para más detalles.');
-          }
-        }
-      });
+    this.productService.triggerScraper()?.subscribe({
+      next: () => {
+        alert('✅ Actualización programada iniciada. Los precios se actualizarán en unos minutos.');
+      },
+      error: (err) => {
+        console.error('Error disparando scraper:', err);
+        alert('❌ Error al iniciar actualización. Revisa la consola para más detalles.');
+      }
     });
   }
 }
