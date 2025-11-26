@@ -267,7 +267,7 @@ def update_tracked_query_timestamp(query_term: str):
     if not db: return
     try:
         # Actualiza el timestamp en TODAS las coincidencias dentro de 'users/*/tracking'
-        docs = db.collection_group('tracking').where(filter=("query", "==", query_term)).stream()
+        docs = db.collection_group('tracking').where("query", "==", query_term).stream()
         batch = db.batch()
         for doc in docs:
             batch.update(doc.reference, {"last_updated": datetime.now().isoformat()})
