@@ -1,5 +1,5 @@
 import { Injectable, signal, NgZone } from "@angular/core";
-import { HttpClient } from "@angular/common/http";
+import { HttpClient, HttpHeaders } from "@angular/common/http";
 import { Product } from "../models/product.model";
 // Firebase JS SDK (no AngularFire to avoid version mismatch)
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -336,5 +336,25 @@ export class ProductService {
     const params = new URLSearchParams({ product_name: query, store_name: store, limit: String(limit) });
     const url = `${environment.apiUrl}/store-options?${params.toString()}`;
     return this.http.get<Array<{ name: string; price: number; url: string; store: string }>>(url);
+  }
+
+  /**
+   * Dispara manualmente el workflow de GitHub Actions para actualizar precios
+   */
+  triggerScraper() {
+    const url = `https://api.github.com/repos/${environment.githubRepo}/actions/workflows/scraper.yml/dispatches`;
+    const token = environment.githubToken;
+
+    if (!token) {
+      console.error('⚠️ GitHub token no configurado en environment.ts');
+      return of({ error: 'Token no configurado' });
+    }
+
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json'
+    });
+
+    return this.http.post(url, { ref: 'main' }, { headers });
   }
 }
