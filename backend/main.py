@@ -18,19 +18,15 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # --- HACK PARA RENDER: INSTALAR NAVEGADOR AL ARRANQUE ---
+# --- HACK PARA RENDER: INSTALAR NAVEGADOR AL ARRANQUE ---
 import sys
 import subprocess
 try:
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        browser.close()
-    print("✅ Navegador encontrado. Continuando...")
-except Exception as e:
-    print(f"⚠️ Navegador no encontrado ({e}). Instalando ahora...")
     subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
-    subprocess.check_call([sys.executable, "-m", "playwright", "install-deps"])
-    print("✅ Navegador instalado correctamente.")
+    print("✅ Chromium instalado correctamente.")
+except Exception as e:
+    print(f"❌ Error instalando Chromium: {e}")
+# -------------------------------------------------------
 # -------------------------------------------------------
 
 # --- INICIALIZACIÓN DE FIREBASE (IDEMPOTENTE) ---
@@ -231,7 +227,7 @@ def update_tracked_query_timestamp(query_term: str):
     if not db: return
     try:
         # Actualiza el timestamp en TODAS las coincidencias dentro de 'users/*/tracking'
-        docs = db.collection_group('tracking').where("query", "==", query_term).stream()
+        docs = db.collection_group('tracking').where(filter=("query", "==", query_term)).stream()
         batch = db.batch()
         for doc in docs:
             batch.update(doc.reference, {"last_updated": datetime.now().isoformat()})
