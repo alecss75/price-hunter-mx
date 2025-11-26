@@ -13,18 +13,17 @@ import { Product } from './models/product.model';
 })
 export class AppComponent {
   constructor(public productService: ProductService) {
-    // Auto-cargar productos guardados cuando el usuario se autentica
+    // Auto-cargar productos guardados desde cache cuando el usuario se autentica
     this.productService.userTracking$.subscribe(trackingItems => {
-      // Para cada producto rastreado, cargarlo automáticamente
       trackingItems.forEach(item => {
         const query = item.query || item.id;
-        // Solo cargar si no está ya en la lista de productos actuales
         const alreadyLoaded = this.productService.getProducts().some(p => 
           (p.query || p.name) === query
         );
         if (!alreadyLoaded) {
-          console.log(`🔄 Auto-cargando producto guardado: ${query}`);
-          this.productService.addProduct(query, false);
+          console.log(`🔄 Auto-cargando desde cache: ${query}`);
+          // Cargar desde Firestore cache en lugar de scraping
+          this.productService.loadProductsFromCache(query);
         }
       });
     });

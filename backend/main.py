@@ -8,7 +8,6 @@ from urllib.parse import urljoin
 from contextlib import asynccontextmanager
 
 import json
-import httpx
 from fastapi import FastAPI, Query, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -139,51 +138,47 @@ async def scrape_store_options(query_term: str, limit: int = 10):
         if browser: await browser.close()
         if playwright: await playwright.stop()
 
-async def background_scraper_task():
-    """
-    Tarea que corre infinitamente para actualizar precios.
-    """
-    while True:
-        try:
-            tracked = get_tracked_queries_db()
-            if not tracked:
-                print("💤 [Background] No hay queries rastreadas. Durmiendo 60s...")
-                await asyncio.sleep(60)
-                continue
-
-            print(f"📋 [Background] Procesando {len(tracked)} queries...")
-            for item in tracked:
-                query = item["query"]
-                # Verificar si necesita actualización (ej: más de 24 horas)
-                last_update = item["last_updated"]
-                needs_update = True
-                if last_update:
-                    try:
-                        last_date = datetime.fromisoformat(last_update)
-                        if datetime.now() - last_date < timedelta(hours=24):
-                            needs_update = False
-                    except: pass
-                
-                if needs_update:
-                    await scrape_and_cache(query)
-                    # Esperar un poco entre queries para no saturar
-                    await asyncio.sleep(10) 
-            
-            # Esperar antes de la siguiente ronda completa
-            print("💤 [Background] Ronda terminada. Durmiendo 1 hora...")
-            await asyncio.sleep(3600) 
-
-        except Exception as e:
-            print(f"💥 [Background] Error en el loop principal: {e}")
-            await asyncio.sleep(60)
+# ===== COMENTADO: Background task reemplazado por GitHub Actions =====
+# async def background_scraper_task():
+#     """
+#     Tarea que corre infinitamente para actualizar precios.
+#     YA NO SE USA - GitHub Actions ejecuta run_scraper.py cada 2 horas
+#     """
+#     while True:
+#         try:
+#             tracked = get_tracked_queries_db()
+#             if not tracked:
+#                 print("💤 [Background] No hay queries rastreadas. Durmiendo 60s...")
+#                 await asyncio.sleep(60)
+#                 continue
+#
+#             print(f"📋 [Background] Procesando {len(tracked)} queries...")
+#             for item in tracked:
+#                 query = item["query"]
+#                 last_update = item["last_updated"]
+#                 needs_update = True
+#                 if last_update:
+#                     try:
+#                         last_date = datetime.fromisoformat(last_update)
+#                         if datetime.now() - last_date < timedelta(hours=24):
+#                             needs_update = False
+#                     except: pass
+#                 
+#                 if needs_update:
+#                     await scrape_and_cache(query)
+#                     await asyncio.sleep(10) 
+#             
+#             print("💤 [Background] Ronda terminada. Durmiendo 1 hora...")
+#             await asyncio.sleep(3600) 
+#
+#         except Exception as e:
+#             print(f"💥 [Background] Error en el loop principal: {e}")
+#             await asyncio.sleep(60)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Iniciar background task
-    task = asyncio.create_task(background_scraper_task())
+    # Background task disabled - GitHub Actions handles scraping
     yield
-    # Shutdown: (Opcional) Cancelar tarea si fuera necesario
-    # task.cancel()
 
 app = FastAPI(title="price-hunter-backend", lifespan=lifespan)
 
@@ -893,110 +888,28 @@ async def scrape_stream(product_name: str = Query(...), force_refresh: bool = Fa
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
-@app.get("/scrape", response_model=List[ScrapeResult])
-async def scrape(product_name: str = Query(...), force_refresh: bool = False):
-    if not product_name: return []
-    if not force_refresh:
-        cached = get_cached_results(product_name)
-        if cached: 
-            for r in cached: r['query_term'] = product_name
-            return [ScrapeResult(**r) for r in cached]
+# ===== ENDPOINTS OBSOLETOS - Comentados porque no se usan =====
+# Frontend usa Firestore directamente, no estos endpoints
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
-        tasks = [consume_search_store(p, browser, s, product_name) for s in STORES] # Fix: dummy consume
-        # Nota: Este endpoint legacy no soporta el generador async directo fácilmente sin refactor, 
-        # se recomienda usar scrape-stream.
-        return [] 
+# @app.get("/scrape", response_model=List[ScrapeResult])
+# async def scrape(product_name: str = Query(...), force_refresh: bool = False):
+#     if not product_name: return []
+#     if not force_refresh:
+#         cached = get_cached_results(product_name)
+#         if cached: 
+#             for r in cached: r['query_term'] = product_name
+#             return [ScrapeResult(**r) for r in cached]
+#     return [] 
 
-# Helper para scrape legacy (simplificado)
-async def consume_search_store(p, b, s, q): pass
+# @app.post("/analyze", response_model=AnalysisResponse)
+# async def analyze(req: AnalysisRequest):
+#     return AnalysisResponse(analysis="Análisis pendiente de implementación lógica.")
 
-@app.post("/analyze", response_model=AnalysisResponse)
-async def analyze(req: AnalysisRequest):
-    return AnalysisResponse(analysis="Análisis pendiente de implementación lógica.")
-
-# --- OPCIONES POR TIENDA (Comparación) ---
-@app.get("/store-options")
-async def store_options(product_name: str = Query(...), store_name: str = Query(...), limit: int = 5):
-    try:
-        store = next((s for s in STORES if s["name"].lower() == store_name.lower()), None)
-        if not store:
-            return []
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
-            options = await collect_store_options(browser, store, product_name, limit)
-            await browser.close()
-            return options
-    except Exception as e:
-        print(f"Error in /store-options: {e}")
-        return []
-
-# --- ENDPOINTS DE TRACKING ---
-
-@app.get("/tracked")
-async def get_tracked():
-    return get_tracked_queries_db()
-
-@app.post("/track")
-async def track_query(query: str = Query(...)):
-    add_tracked_query_db(query)
-    # Opcional: Iniciar scrape inmediato en background
-    asyncio.create_task(scrape_and_cache(query))
-    return {"status": "ok", "message": f"Rastreando: {query}"}
-
-@app.delete("/track")
-async def untrack_query(query: str = Query(...)):
-    remove_tracked_query_db(query)
-    return {"status": "ok", "message": f"Dejado de rastrear: {query}"}
-
-@app.post("/trigger-scraper")
-async def trigger_scraper(authorization: str = Header(None)):
-    """
-    Dispara el workflow de GitHub Actions para actualizar precios.
-    Requiere autenticación Firebase: Header 'Authorization: Bearer <firebase_id_token>'
-    """
-    # 1. Validar token de Firebase
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Token de autenticación requerido")
-    
-    id_token = authorization.split("Bearer ")[1]
-    
-    try:
-        # Verificar el token con Firebase Admin SDK
-        decoded_token = auth.verify_id_token(id_token)
-        uid = decoded_token['uid']
-        print(f"✅ Usuario autenticado: {uid}")
-    except Exception as e:
-        print(f"❌ Error verificando token: {e}")
-        raise HTTPException(status_code=401, detail="Token inválido o expirado")
-    
-    # 2. Disparar GitHub Actions workflow
-    github_token = os.environ.get("GITHUB_TOKEN")
-    github_repo = os.environ.get("GITHUB_REPO", "alecss75/price-hunter-mx")
-    
-    if not github_token:
-        raise HTTPException(status_code=500, detail="GitHub token no configurado en el servidor")
-    
-    url = f"https://api.github.com/repos/{github_repo}/actions/workflows/scraper.yml/dispatches"
-    headers = {
-        "Authorization": f"Bearer {github_token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    payload = {"ref": "main"}
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(url, headers=headers, json=payload)
-            if response.status_code == 204:
-                return {"status": "ok", "message": "Scraper iniciado exitosamente"}
-            else:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"Error de GitHub API: {response.text}"
-                )
-        except httpx.RequestError as e:
-            raise HTTPException(status_code=500, detail=f"Error conectando con GitHub: {str(e)}")
+# @app.get("/store-options") - Reemplazado por Firestore store_options collection
+# @app.get("/tracked") - No usado
+# @app.post("/track") - Frontend usa Firestore directamente
+# @app.delete("/track") - Frontend usa Firestore directamente  
+# @app.post("/trigger-scraper") - Eliminado por seguridad (no exponer tokens)
 
 if __name__ == "__main__":
     import uvicorn

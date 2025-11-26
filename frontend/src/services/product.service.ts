@@ -233,22 +233,59 @@ export class ProductService {
 
   // Guardar tracking en tu lista privada
   async trackProduct(query: string) {
-    const u = firebaseAuth.currentUser;
-    if (!u) return alert("Inicia sesión para guardar");
+    try {
+      const u = firebaseAuth.currentUser;
+      if (!u) {
+        alert("Inicia sesión para guardar");
+        return;
+      }
 
-    const docRef = doc(firebaseDb, `users/${u.uid}/tracking/${query.toLowerCase()}`);
-    await setDoc(docRef, {
-      query: query,
-      created_at: new Date(),
-      last_updated: null,
-    });
+      const docRef = doc(firebaseDb, `users/${u.uid}/tracking/${query.toLowerCase()}`);
+      await setDoc(docRef, {
+        query: query,
+        created_at: new Date(),
+        last_updated: null,
+      });
+    } catch (error) {
+      console.error('Error guardando producto:', error);
+      alert('Error al guardar el producto. Intenta de nuevo.');
+    }
   }
 
   async untrackProduct(queryId: string) {
-    const u = firebaseAuth.currentUser;
-    if (!u) return;
-    const docRef = doc(firebaseDb, `users/${u.uid}/tracking/${queryId}`);
-    await deleteDoc(docRef);
+    try {
+      const u = firebaseAuth.currentUser;
+      if (!u) return;
+      const docRef = doc(firebaseDb, `users/${u.uid}/tracking/${queryId}`);
+      await deleteDoc(docRef);
+    } catch (error) {
+      console.error('Error eliminando producto:', error);
+      alert('Error al eliminar el producto. Intenta de nuevo.');
+    }
+  }
+
+  // Cargar productos desde Firestore cache (optimizado para auto-load)
+  loadProductsFromCache(query: string): void {
+    const queryLower = query.toLowerCase();
+    const docRef = doc(firebaseDb, 'cached_results', queryLower);
+    
+    getDoc(docRef).then(docSnap => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const results = data['results'] || [];
+        
+        // Procesar cada resultado del cache
+        results.forEach((res: any) => {
+          this.processSingleResult(res);
+        });
+        
+        console.log(`✅ Cargados ${results.length} productos desde cache para: ${query}`);
+      } else {
+        console.log(`⚠️ No hay cache para: ${query}. Esperando pr próxima actualización de GitHub Actions.`);
+      }
+    }).catch(error => {
+      console.error('Error cargando desde cache:', error);
+    });
   }
 
   private addMockProduct(productName: string): void {

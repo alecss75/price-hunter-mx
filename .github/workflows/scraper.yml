@@ -1,9 +1,9 @@
-name: Price Scraper (Every 30 min)
+name: Price Scraper (Every 2 hours)
 
 on:
   schedule:
-    # Ejecutar cada 30 minutos (48 veces al día)
-    - cron: '0,30 * * * *'
+    # Ejecutar cada 2 horas (12 veces al día) - evita rate limiting
+    - cron: '0 */2 * * *'
   workflow_dispatch: # Permite correrlo manual con un botón
 
 jobs:

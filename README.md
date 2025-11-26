@@ -1,6 +1,15 @@
 # 🦈 Price Hunter MX
 
-Sistema de comparación de precios en tiempo real para el mercado mexicano.
+Sistema de comparación de precios en tiempo real para el mercado mexicano con arquitectura **100% serverless**.
+
+## 🏗️ Arquitectura
+
+- **Frontend:** Angular 20 en Firebase Hosting
+- **Scraping:** GitHub Actions (cada 2 horas)
+- **Base de datos:** Firestore
+- **Autenticación:** Firebase Auth (Google Sign-In)
+
+Sin servidores backend persistentes - todo está automatizado y escalable.
 
 ## 📂 Estructura del Proyecto
 
@@ -10,13 +19,13 @@ price-hunter-mx/
 │   ├── src/          # Componentes, servicios, modelos
 │   ├── angular.json
 │   └── tsconfig.json
-├── backend/           # API FastAPI + Scraper
-│   ├── main.py       # API REST con streaming
+├── backend/           # Scripts de scraping
+│   ├── main.py       # API FastAPI (solo desarrollo local)
 │   ├── run_scraper.py # Script para GitHub Actions
 │   └── requirements.txt
 ├── .github/
 │   └── workflows/
-│       └── scraper.yml # Automatización diaria
+│       └── scraper.yml # Automatización cada 2 horas
 └── package.json       # Dependencias del proyecto
 ```
 
@@ -28,17 +37,17 @@ npm install
 npm run dev
 ```
 
-### Backend (FastAPI)
+### Backend Local (FastAPI - Opcional para desarrollo)
 ```bash
 cd backend
 pip install -r requirements.txt
-playwright install
+playwright install chromium
 python main.py
 ```
 
 ## 🤖 Automatización con GitHub Actions
 
-El scraper se ejecuta automáticamente 2 veces al día (8 AM y 8 PM CDMX) usando GitHub Actions + Firestore.
+El scraper se ejecuta automáticamente **cada 2 horas** (12 veces al día) usando GitHub Actions + Firestore.
 
 ### Configuración:
 1. Crea un proyecto en Firebase
@@ -47,44 +56,81 @@ El scraper se ejecuta automáticamente 2 veces al día (8 AM y 8 PM CDMX) usando
 4. Pega el contenido del JSON en el secreto
 5. Push al repositorio
 
-## 🚢 Deploy en Firebase (Hosting + Cloud Run)
+## 🚢 Deploy
 
-### 1️⃣ Setup Inicial
-```bash
-npm install -g firebase-tools
-firebase login
-```
-
-### 2️⃣ Configurar Proyecto
-Edita `.firebaserc` y reemplaza `YOUR_PROJECT_ID` con tu ID de Firebase.
-
-### 3️⃣ Deploy Frontend
+### Frontend (Firebase Hosting)
 ```bash
 npm run build
-firebase deploy --only hosting
+npm run deploy
 ```
 
-### 4️⃣ Deploy Backend (Cloud Run)
+O simplemente:
 ```bash
-cd backend
-gcloud run deploy price-hunter-backend \
-  --source . \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars FIREBASE_CREDENTIALS_JSON=""
+npm run deploy
 ```
 
-Luego actualiza `frontend/src/services/product.service.ts` con la URL de Cloud Run.
+URL en producción: https://price-hunter-mx.web.app
 
-### 5️⃣ Variables de Entorno Cloud Run
-En Cloud Console → Cloud Run → tu servicio → Variables:
-- `FIREBASE_CREDENTIALS_JSON`: (déjalo vacío, Cloud Run usa credenciales implícitas)
+## 🔑 Configuración Firebase
 
-## 🔑 Variables de Entorno (Local)
+1. Crea proyecto en [Firebase Console](https://console.firebase.google.com)
+2. Habilita:
+   - **Authentication** → Google Sign-In
+   - **Firestore Database** → Modo producción
+   - **Hosting**
+3. Copia las credenciales a `frontend/src/firebase.config.ts`
+4. Configura Security Rules en Firestore:
 
-Crea `.env.local` con:
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Usuarios solo pueden leer/escribir sus propios datos
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Cache de precios - lectura pública, escritura solo para servidor
+    match /cached_results/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // Opciones de comparación - lectura pública
+    match /store_options/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
 ```
-GEMINI_API_KEY=tu_api_key_aqui
-```
 
-Firebase config: `frontend/src/firebase.config.ts` (ya configurado si llenaste tus credenciales)
+## ✨ Funcionalidades
+
+- ✅ Scraping automático de 4 tiendas mexicanas
+- ✅ Comparación de precios en tiempo real
+- ✅ Historial de precios
+- ✅ Opciones de comparación (hasta 10 alternativas)
+- ✅ Autenticación con Google
+- ✅ Listas privadas por usuario
+- ✅ Sincronización en tiempo real con Firestore
+- ✅ Actualización automática cada 2 horas vía GitHub Actions
+
+## 🛠️ Tecnologías
+
+**Frontend:**
+- Angular 20
+- TailwindCSS
+- Firebase JS SDK
+- RxJS
+
+**Backend/Scraping:**
+- Python 3.10+
+- FastAPI (dev only)
+- Playwright
+- Firebase Admin SDK
+
+**Infraestructura:**
+- Firebase Hosting
+- Firestore
+- GitHub Actions
