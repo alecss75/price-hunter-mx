@@ -1,14 +1,9 @@
-name: Daily Price Scraper
+name: Price Scraper (Every 30 min)
 
 on:
   schedule:
-    # Ejecutar cada 4 horas (6 veces al día)
-    - cron: '0 0 * * *'   # 00:00 UTC (6:00 PM CDMX del día anterior)
-    - cron: '0 4 * * *'   # 04:00 UTC (10:00 PM CDMX del día anterior)
-    - cron: '0 8 * * *'   # 08:00 UTC (2:00 AM CDMX)
-    - cron: '0 12 * * *'  # 12:00 UTC (6:00 AM CDMX)
-    - cron: '0 16 * * *'  # 16:00 UTC (10:00 AM CDMX)
-    - cron: '0 20 * * *'  # 20:00 UTC (2:00 PM CDMX)
+    # Ejecutar cada 30 minutos (48 veces al día)
+    - cron: '0,30 * * * *'
   workflow_dispatch: # Permite correrlo manual con un botón
 
 jobs:
