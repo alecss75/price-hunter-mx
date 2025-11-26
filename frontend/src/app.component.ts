@@ -90,16 +90,4 @@ export class AppComponent {
       this.productForm.reset();
     }
   }
-
-  triggerManualUpdate(): void {
-    this.productService.triggerScraper()?.subscribe({
-      next: () => {
-        alert('✅ Actualización programada iniciada. Los precios se actualizarán en unos minutos.');
-      },
-      error: (err) => {
-        console.error('Error disparando scraper:', err);
-        alert('❌ Error al iniciar actualización. Revisa la consola para más detalles.');
-      }
-    });
-  }
 }

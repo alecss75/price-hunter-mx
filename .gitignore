@@ -42,6 +42,3 @@ venv/
 ServiceAccountPriceHunterMx.json
 .env
 .env.local
-
-# Environment con GitHub token
-frontend/src/environments/environment.ts
