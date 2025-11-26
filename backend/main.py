@@ -95,6 +95,50 @@ async def scrape_and_cache(query_term: str):
         if browser: await browser.close()
         if playwright: await playwright.stop()
 
+async def scrape_store_options(query_term: str, limit: int = 10):
+    """
+    Scrapes múltiples opciones de comparación para cada tienda y las guarda en Firestore.
+    Se ejecuta en GitHub Actions para pre-cargar opciones sin necesidad de backend.
+    """
+    print(f"🔍 [Store Options] Scraping opciones para: {query_term}")
+    playwright = None
+    browser = None
+    try:
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(
+            headless=True, 
+            args=["--disable-blink-features=AutomationControlled"]
+        )
+        
+        all_options = []
+        for store in STORES:
+            try:
+                print(f"  📦 Buscando en {store['name']}...")
+                options = await collect_store_options(browser, store, query_term, limit)
+                all_options.extend(options)
+                print(f"  ✅ Encontradas {len(options)} opciones en {store['name']}")
+            except Exception as e:
+                print(f"  ❌ Error en {store['name']}: {e}")
+
+        if all_options and db:
+            # Guardar en Firestore: store_options/{query_term_lowercase}
+            doc_ref = db.collection("store_options").document(query_term.lower())
+            doc_ref.set({
+                "query_term": query_term.lower(),
+                "updated_at": datetime.now().isoformat(),
+                "options": all_options,
+                "total_options": len(all_options)
+            })
+            print(f"✅ [Store Options] Guardadas {len(all_options)} opciones para {query_term}")
+        else:
+            print(f"⚠️ [Store Options] No se encontraron opciones para {query_term}")
+
+    except Exception as e:
+        print(f"💥 [Store Options] Error crítico para {query_term}: {e}")
+    finally:
+        if browser: await browser.close()
+        if playwright: await playwright.stop()
+
 async def background_scraper_task():
     """
     Tarea que corre infinitamente para actualizar precios.

@@ -2,7 +2,7 @@ import asyncio
 import os
 # Importamos tus funciones del main.py
 # Asegúrate de que en main.py NO se ejecute uvicorn automáticamente al importar
-from main import scrape_and_cache, get_tracked_queries_db
+from main import scrape_and_cache, scrape_store_options, get_tracked_queries_db
 
 async def main():
     print("🚀 Iniciando Scraper Programado en GitHub Actions...")
@@ -23,6 +23,10 @@ async def main():
         print(f"\n--- Buscando: {product} ---")
         # Usamos tu función que ya guarda en Firestore
         await scrape_and_cache(product)
+        
+        # NUEVO: También scrapear opciones de comparación para cada tienda
+        print(f"\n🔍 Buscando opciones de comparación para: {product}")
+        await scrape_store_options(product)
     
     print("\n✅ Todo terminado. Apagando.")
 

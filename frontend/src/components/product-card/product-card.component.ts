@@ -111,9 +111,10 @@ export class ProductCardComponent {
 
   private loadOptions() {
     const q = this.product.query || this.product.name;
-    const store = this.product.store;
+    // Pasamos empty string para obtener opciones de TODAS las tiendas
+    const store = ''; // Empty = todas las tiendas
     this.optionsLoading = true;
-    this.productService.getStoreOptions(q, store, 5).subscribe({
+    this.productService.getStoreOptions(q, store, 10).subscribe({
       next: (opts: any) => {
         this.options = opts || [];
         this.optionsLoading = false;

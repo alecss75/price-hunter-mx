@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from "@angular/common/http";
 import { Product } from "../models/product.model";
 // Firebase JS SDK (no AngularFire to avoid version mismatch)
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { firebaseAuth, firebaseDb } from '../firebase.config';
 import { switchMap, of, Observable } from 'rxjs';
 import { environment } from '../environments/environment';
@@ -331,10 +331,37 @@ export class ProductService {
     );
   }
 
-  // Fetch more options for comparison from the same store
-  getStoreOptions(query: string, store: string, limit: number = 5) {
-    const params = new URLSearchParams({ product_name: query, store_name: store, limit: String(limit) });
-    const url = `${environment.apiUrl}/store-options?${params.toString()}`;
-    return this.http.get<Array<{ name: string; price: number; url: string; store: string }>>(url);
+  // Fetch more options for comparison from Firestore (pre-scraped by GitHub Actions)
+  getStoreOptions(query: string, store: string, limit: number = 10): Observable<Array<{ name: string; price: number; url: string; store: string }>> {
+    return new Observable(observer => {
+      const queryLower = query.toLowerCase();
+      const docRef = doc(firebaseDb, 'store_options', queryLower);
+      
+      getDoc(docRef).then(docSnap => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const allOptions = data['options'] || [];
+          
+          // Filter by store if specified, otherwise return all
+          let filteredOptions = store 
+            ? allOptions.filter((opt: any) => opt.store === store)
+            : allOptions;
+          
+          // Limit results
+          filteredOptions = filteredOptions.slice(0, limit);
+          
+          observer.next(filteredOptions);
+          observer.complete();
+        } else {
+          // No options found in Firestore
+          observer.next([]);
+          observer.complete();
+        }
+      }).catch(error => {
+        console.error('Error fetching store options:', error);
+        observer.error(error);
+      });
+    });
   }
 }
+

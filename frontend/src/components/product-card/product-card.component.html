@@ -187,12 +187,15 @@
           </div>
         </div>
         <ng-template #analyzeButton>
+          <!-- COMENTADO: requiere backend no desplegado -->
+          <!--
           <button
             (click)="getAnalysis()"
             class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 h-10"
           >
             <span>Analizar Tendencia con IA</span>
           </button>
+          -->
         </ng-template>
 
         <p *ngIf="error" class="text-red-400 text-xs mt-2 text-center">
@@ -218,9 +221,12 @@
         <div *ngIf="optionsOpen" class="mt-3 bg-gray-900/50 border border-gray-700 rounded-lg p-3">
           <div *ngIf="optionsLoading" class="text-gray-400 text-sm">Cargando opciones...</div>
           <div *ngIf="!optionsLoading && options.length === 0" class="text-gray-500 text-sm">No hay opciones adicionales.</div>
-          <ul *ngIf="!optionsLoading && options.length > 0" class="space-y-2">
-            <li *ngFor="let opt of options" class="flex items-center justify-between">
-              <div class="pr-3">
+          <ul *ngIf="!optionsLoading && options.length > 0" class="space-y-3">
+            <li *ngFor="let opt of options" class="flex items-center justify-between border-b border-gray-700 pb-2 last:border-b-0">
+              <div class="pr-3 flex-grow">
+                <div class="flex items-center space-x-2 mb-1">
+                  <span class="text-xs font-semibold text-sky-400">{{ opt.store }}</span>
+                </div>
                 <p class="text-sm text-gray-200 line-clamp-2">{{ opt.name }}</p>
                 <a [href]="opt.url" target="_blank" rel="noopener noreferrer" class="text-xs text-sky-400 hover:text-sky-300">Ver opción →</a>
               </div>
