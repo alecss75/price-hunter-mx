@@ -12,7 +12,23 @@ import { Product } from './models/product.model';
   imports: [CommonModule, ProductCardComponent, ReactiveFormsModule],
 })
 export class AppComponent {
-  constructor(public productService: ProductService) {}
+  constructor(public productService: ProductService) {
+    // Auto-cargar productos guardados cuando el usuario se autentica
+    this.productService.userTracking$.subscribe(trackingItems => {
+      // Para cada producto rastreado, cargarlo automáticamente
+      trackingItems.forEach(item => {
+        const query = item.query || item.id;
+        // Solo cargar si no está ya en la lista de productos actuales
+        const alreadyLoaded = this.productService.getProducts().some(p => 
+          (p.query || p.name) === query
+        );
+        if (!alreadyLoaded) {
+          console.log(`🔄 Auto-cargando producto guardado: ${query}`);
+          this.productService.addProduct(query, false);
+        }
+      });
+    });
+  }
 
   isAddingProduct = false;
   collapsedGroups = new Set<string>();
