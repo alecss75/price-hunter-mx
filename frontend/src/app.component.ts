@@ -76,8 +76,18 @@ export class AppComponent {
   }
 
   deleteGroup(groupName: string): void {
+    const confirmed = confirm(
+      `⚠️ ¿Eliminar "${groupName}" definitivamente?\n\nEsto removerá el producto de tu lista guardada.\nSi lo agregas de nuevo, empezará un historial nuevo.`
+    );
+    
+    if (!confirmed) return;
+
+    // Eliminar de la UI
     const productsToDelete = this.products.filter((p) => (p.query || p.name) === groupName);
     productsToDelete.forEach((p) => this.productService.deleteProduct(p.id));
+    
+    // Eliminar definitivamente de Firestore
+    this.productService.untrackProduct(groupName.toLowerCase());
   }
 
   onSubmit(): void {
