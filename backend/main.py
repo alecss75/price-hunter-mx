@@ -8,14 +8,15 @@ from urllib.parse import urljoin
 from contextlib import asynccontextmanager
 
 import json
-from fastapi import FastAPI, Query
+import httpx
+from fastapi import FastAPI, Query, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from playwright.async_api import async_playwright
 
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth
 
 # --- HACK PARA RENDER: INSTALAR NAVEGADOR AL ARRANQUE ---
 # --- HACK PARA RENDER: INSTALAR NAVEGADOR AL ARRANQUE ---
@@ -904,6 +905,54 @@ async def track_query(query: str = Query(...)):
 async def untrack_query(query: str = Query(...)):
     remove_tracked_query_db(query)
     return {"status": "ok", "message": f"Dejado de rastrear: {query}"}
+
+@app.post("/trigger-scraper")
+async def trigger_scraper(authorization: str = Header(None)):
+    """
+    Dispara el workflow de GitHub Actions para actualizar precios.
+    Requiere autenticación Firebase: Header 'Authorization: Bearer <firebase_id_token>'
+    """
+    # 1. Validar token de Firebase
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token de autenticación requerido")
+    
+    id_token = authorization.split("Bearer ")[1]
+    
+    try:
+        # Verificar el token con Firebase Admin SDK
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token['uid']
+        print(f"✅ Usuario autenticado: {uid}")
+    except Exception as e:
+        print(f"❌ Error verificando token: {e}")
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+    
+    # 2. Disparar GitHub Actions workflow
+    github_token = os.environ.get("GITHUB_TOKEN")
+    github_repo = os.environ.get("GITHUB_REPO", "alecss75/price-hunter-mx")
+    
+    if not github_token:
+        raise HTTPException(status_code=500, detail="GitHub token no configurado en el servidor")
+    
+    url = f"https://api.github.com/repos/{github_repo}/actions/workflows/scraper.yml/dispatches"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    payload = {"ref": "main"}
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(url, headers=headers, json=payload)
+            if response.status_code == 204:
+                return {"status": "ok", "message": "Scraper iniciado exitosamente"}
+            else:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Error de GitHub API: {response.text}"
+                )
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=500, detail=f"Error conectando con GitHub: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

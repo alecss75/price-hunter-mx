@@ -1,12 +1,7 @@
 import { Injectable, signal, NgZone } from "@angular/core";
 import { HttpClient, HttpHeaders } from "@angular/common/http";
 import { Product } from "../models/product.model";
-// Firebase JS SDK (no AngularFire to avoid version mismatch)
-import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { firebaseAuth, firebaseDb } from '../firebase.config';
-import { switchMap, of, Observable } from 'rxjs';
-import { environment } from '../environments/environment';
+import { environment } from "../environments/environment";
 
 interface ScrapeResult {
   name: string;
@@ -24,31 +19,7 @@ export class ProductService {
   searchLogs = signal<string[]>([]);
   isLoading = signal<boolean>(false);
 
-  constructor(private http: HttpClient, private ngZone: NgZone) {}
-
-  // Usuario actual (Observable)
-  user$ = new Observable<any>((subscriber) => {
-    const unsub = onAuthStateChanged(firebaseAuth, (u) => subscriber.next(u));
-    return () => unsub();
-  });
-
-  // Lista de tracking privada del usuario
-  userTracking$ = this.user$.pipe(
-    switchMap(u => {
-      if (u) {
-        return new Observable<any[]>((subscriber) => {
-          const trackingCol = collection(firebaseDb, `users/${u.uid}/tracking`);
-          const unsub = onSnapshot(trackingCol, (snap) => {
-            const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            subscriber.next(items as any[]);
-          });
-          return () => unsub();
-        });
-      } else {
-        return of([]);
-      }
-    })
-  );
+  constructor(private http: HttpClient, private ngZone: NgZone) {} // Inyectar NgZone
 
   private availableStoresData: {
     name: Product["store"];
@@ -105,17 +76,8 @@ export class ProductService {
     return this.availableStoresData;
   }
 
-  // Auth
-  login() {
-    return signInWithPopup(firebaseAuth, new GoogleAuthProvider());
-  }
-
-  logout() {
-    return signOut(firebaseAuth);
-  }
-
   loadBackendProducts(): void {
-    this.http.get<ScrapeResult[]>(`${environment.apiUrl}/products`).subscribe({
+    this.http.get<ScrapeResult[]>("http://localhost:8000/products").subscribe({
       next: (results) => {
         this.products.update((currentProducts) => {
           const updatedProducts = [...currentProducts];
@@ -188,7 +150,7 @@ export class ProductService {
     ]);
 
     // Usamos EventSource para conectar al endpoint de Streaming
-    const url = `${environment.apiUrl}/scrape-stream?product_name=${encodeURIComponent(productName)}&force_refresh=${forceRefresh}`;
+    const url = `http://localhost:8000/scrape-stream?product_name=${encodeURIComponent(productName)}&force_refresh=${forceRefresh}`;
     console.log('Connecting to EventSource:', url);
     
     const eventSource = new EventSource(url);
@@ -229,26 +191,6 @@ export class ProductService {
         eventSource.close();
       });
     };
-  }
-
-  // Guardar tracking en tu lista privada
-  async trackProduct(query: string) {
-    const u = firebaseAuth.currentUser;
-    if (!u) return alert("Inicia sesión para guardar");
-
-    const docRef = doc(firebaseDb, `users/${u.uid}/tracking/${query.toLowerCase()}`);
-    await setDoc(docRef, {
-      query: query,
-      created_at: new Date(),
-      last_updated: null,
-    });
-  }
-
-  async untrackProduct(queryId: string) {
-    const u = firebaseAuth.currentUser;
-    if (!u) return;
-    const docRef = doc(firebaseDb, `users/${u.uid}/tracking/${queryId}`);
-    await deleteDoc(docRef);
   }
 
   private addMockProduct(productName: string): void {
@@ -331,38 +273,23 @@ export class ProductService {
     );
   }
 
-  // Fetch more options for comparison from the same store
-  getStoreOptions(query: string, store: string, limit: number = 5) {
-    const params = new URLSearchParams({ product_name: query, store_name: store, limit: String(limit) });
-    const url = `${environment.apiUrl}/store-options?${params.toString()}`;
-    return this.http.get<Array<{ name: string; price: number; url: string; store: string }>>(url);
-  }
-
   /**
    * Dispara manualmente el workflow de GitHub Actions para actualizar precios
-   * Ahora llama al backend que valida la autenticación y dispara el workflow de forma segura
    */
-  async triggerScraper() {
-    const user = firebaseAuth.currentUser;
-    
-    if (!user) {
-      console.error('⚠️ Usuario no autenticado');
-      return of({ error: 'Debes iniciar sesión para usar esta función' });
+  triggerScraper() {
+    const url = `https://api.github.com/repos/${environment.githubRepo}/actions/workflows/scraper.yml/dispatches`;
+    const token = environment.githubToken;
+
+    if (!token) {
+      console.error('⚠️ GitHub token no configurado en environment.ts');
+      return;
     }
 
-    try {
-      // Obtener el token de Firebase del usuario actual
-      const idToken = await user.getIdToken();
-      
-      const url = `${environment.apiUrl}/trigger-scraper`;
-      const headers = new HttpHeaders({
-        'Authorization': `Bearer ${idToken}`
-      });
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json'
+    });
 
-      return this.http.post(url, {}, { headers });
-    } catch (error) {
-      console.error('Error obteniendo token de Firebase:', error);
-      return of({ error: 'Error de autenticación' });
-    }
+    return this.http.post(url, { ref: 'main' }, { headers });
   }
 }

@@ -4,3 +4,4 @@ playwright==1.48.0
 python-multipart==0.0.12
 playwright-stealth
 firebase-admin
+httpx
